@@ -1,0 +1,136 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "WebAppName": {
+            "type": "string"
+        },
+        "location": {
+            "type": "string"
+        },
+        "hostingPlanName": {
+            "type": "string"
+        },
+        "alwaysOn": {
+            "type": "bool",
+            "defaultValue": "false"
+        },
+        "sku": {
+            "type": "string",
+            "defaultValue": "Free"
+
+        },
+        "skuCode": {
+            "type": "string",
+            "defaultValue": "F1"
+        },
+        "workerSize": {
+            "type": "string",
+            "defaultValue": "0"
+        },
+        "workerSizeId": {
+            "type": "string",
+            "defaultValue": "0"
+        },
+        "numberOfWorkers": {
+            "type": "string",
+            "defaultValue": "1"
+        },
+        "currentStack": {
+            "type": "string",
+            "defaultValue": "dotnet"
+        },
+        "phpVersion": {
+            "type": "string",
+            "defaultValue": "OFF"
+        },
+        "netFrameworkVersion": {
+            "type": "string",
+            "defaultValue": "v4.0"
+        }
+    },
+    "variables": {
+        "appInsightName": "[concat('AppInisight-',parameters('WebAppName'),uniqueString(resourceGroup().id))]"
+    },
+    "resources": [
+        {
+            "apiVersion": "2021-02-01",
+            "name": "[parameters('hostingPlanName')]",
+            "type": "Microsoft.Web/serverfarms",
+            "location": "[parameters('location')]",
+            "kind": "",
+            "tags": {},
+            "dependsOn": [],
+            "properties": {
+                "name": "[parameters('hostingPlanName')]",
+                "workerSize": "[parameters('workerSize')]",
+                "workerSizeId": "[parameters('workerSizeId')]",
+                "numberOfWorkers": "[parameters('numberOfWorkers')]"
+            },
+            "sku": {
+                "Tier": "[parameters('sku')]",
+                "Name": "[parameters('skuCode')]"
+            }
+        },
+        {
+            "apiVersion": "2020-02-02-preview",
+            "name": "[variables('appInsightName')]",
+            "type": "microsoft.insights/components",
+            "location": "eastus",
+            "tags": {},
+            "dependsOn": [],
+            "properties": {
+                "ApplicationId": "[parameters('WebAppName')]",
+                "Request_Source": "IbizaWebAppExtensionCreate",
+                "Flow_Type": "Redfield",
+                "Application_Type": "web",
+                "WorkspaceResourceId": "/subscriptions/09ec6eca-be65-4b9d-ad59-cc0d15f7c5bb/resourcegroups/defaultresourcegroup-eus/providers/microsoft.operationalinsights/workspaces/defaultworkspace-09ec6eca-be65-4b9d-ad59-cc0d15f7c5bb-eus"
+            }
+        },
+        {
+            "apiVersion": "2021-02-01",
+            "name": "[parameters('WebAppName')]",
+            "type": "Microsoft.Web/sites",
+            "location": "[parameters('location')]",
+            "tags": {},
+            "dependsOn": [
+                "[concat('microsoft.insights/components/',variables('appInsightName'))]",
+                "[concat('Microsoft.Web/serverfarms/', parameters('hostingPlanName'))]"
+            ],
+            "properties": {
+                "name": "[parameters('WebAppName')]",
+                "siteConfig": {
+                    "appSettings": [
+                        {
+                            "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+                            "value": "[reference(concat('microsoft.insights/components/',variables('appInsightName')), '2015-05-01').InstrumentationKey]"
+                        },
+                        {
+                            "name": "APPLICATIONINSIGHTS_CONNECTION_STRING",
+                            "value": "[reference(concat('microsoft.insights/components/',variables('appInsightName')), '2015-05-01').ConnectionString]"
+                        },
+                        {
+                            "name": "ApplicationInsightsAgent_EXTENSION_VERSION",
+                            "value": "~2"
+                        },
+                        {
+                            "name": "XDT_MicrosoftApplicationInsights_Mode",
+                            "value": "default"
+                        }
+                    ],
+                    "metadata": [
+                        {
+                            "name": "CURRENT_STACK",
+                            "value": "[parameters('currentStack')]"
+                        }
+                    ],
+                    "phpVersion": "[parameters('phpVersion')]",
+                    "netFrameworkVersion": "[parameters('netFrameworkVersion')]",
+                    "alwaysOn": "[parameters('alwaysOn')]"
+                },
+                "serverFarmId": "[concat('/subscriptions/', subscription().subscriptionId,'/resourcegroups/', resourceGroup().name, '/providers/Microsoft.Web/serverfarms/', parameters('hostingPlanName'))]",
+                "clientAffinityEnabled": true
+            }
+        }
+    ]
+}
